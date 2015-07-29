@@ -1,14 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <beans xmlns="http://www.springframework.org/schema/beans"
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://www.springframework.org/schema/beans  
-http://www.springframework.org/schema/beans/spring-beans.xsd">
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:tx="http://www.springframework.org/schema/tx"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+		http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-3.1.xsd
+		http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-3.1.xsd">
 
-	<!-- Root Context: defines shared resources visible to all other web components -->
-	<bean id="transactionManager"
-		class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
-		<property name="dataSource" ref="dataSource" />
+	<!-- Root Context를 설정하는 곳으로, 공유할 부분을 설정하는 부분입니다. -->
+
+	<!-- commons dbcp : 커넥션 풀 사용 -->
+	<bean id="dataSource" class="org.apache.commons.dbcp.BasicDataSource">
+		<property name="driverClassName" value="${jdbc.driverClassName}" ></property>
+		<property name="url" value="${jdbc.url}" ></property>
+		<property name="username" value="${jdbc.username}" ></property>
+		<property name="password" value="${jdbc.password}" ></property>
 	</bean>
+
+	<!-- 데이터베이스 설정 값이 기술되어 있는 .properties 파일의 위치를 설정해줌 -->
+	<context:property-placeholder location="classpath:jdbc.properties" />
+
 	<!-- sqlSession을 생성하기 위해 SqlSessionFactory를 사용 -->
 	<!-- mapper 밑에 있는 sql문을 읽어와서 빈으로 생성 dataSource를 읽어와서 빈으로 생성 
 mybatis-config.xml을 읽어오도록 해줌 -->
@@ -16,17 +27,40 @@ mybatis-config.xml을 읽어오도록 해줌 -->
 		<property name="dataSource" ref="dataSource" />
 		<property name="configLocation" value="/WEB-INF/spring/mybatis-config.xml" />
 	</bean>
-	<!-- ORACLE과 연동을 해줌 -->
-	<bean id="dataSource" class="org.apache.commons.dbcp.BasicDataSource"
-		destroy-method="close">
-		<property name="driverClassName" value="oracle.jdbc.OracleDriver" />
-		<property name="url" value="jdbc:oracle:thin:@192.168.1.45:1521:orcl" />
-		<property name="username" value="scott" />
-		<property name="password" value="tiger" />
-	</bean>
+
 	<!-- Mybatis-Spring 연동모듈의 핵심 SqlSessionTemplate은 SqlSession을 구현하고 코드에서 
 SqlSession를 대체하는 역할을 한다. SqlSessionTemplate은 쓰레드에 안전하고 여러개의 DAO나  매퍼에서 공유할 수 있다. -->
 	<bean id="sqlSessionTemplate" class="org.mybatis.spring.SqlSessionTemplate">
 		<constructor-arg index="0" ref="sqlSessionFactory" />
 	</bean>
+
+	<!-- 맵퍼 인터페이스와 맵퍼 XML 파일에 의해 생성되는 맵퍼 클래스를 빈에 주입할 수 있도록 설정 -->
+	<!-- mapper namespace의 이름이 basePackage의 값과 동일하면, xml과 인터페이스를 연결시켜줍니다. -->
+	<bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+		<property name="basePackage" value="com.inyoung.test.dao"></property>
+	</bean>
+
+	<!-- 트랜잭션 관리자. id가 transactionManager이면, 아래 tx:annotation-driven에서 transactionManager 속성을 지정할 필요 없음 -->
+	<bean id="transactionManager"
+		class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+		<property name="dataSource" ref="dataSource" />
+	</bean>
+	
+	<!-- 애노테이션으로 트랜젝션 설정할 수 있도록 -->
+	<tx:annotation-driven/>
+
+	<!-- 사용자가 직접 해당오류를 처리할 수 있게 설정 -->
+	<bean id="exceptionHandler" class="org.springframework.web.servlet.handler.SimpleMappingExceptionResolver">
+		<property name="exceptionMappings">
+			<props>
+				<!-- 해당 에러가 발생 시, 뷰페이지를 error.jsp로 설정 -->
+				<prop key="org.springframework.validation.BindException">error</prop>
+				<prop key="org.springframework.dao.DataIntegrityViolationException">error</prop>
+			</props>
+		</property>
+	</bean>
+	
+	<!-- base-package를 스캔하여 @Component, @Repository, @Service, @Controller등의 annotation을 bean으로 자동 등록해줍니다. -->
+	<context:component-scan base-package="com.inyoung.test"/>
+	
 </beans>
